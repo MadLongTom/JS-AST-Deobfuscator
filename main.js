@@ -12,7 +12,7 @@ function a0_0x33ea() {
   while (true) {
     try {
       var _0x21c074 = -parseInt(_0x206155(0x427)) / 0x1 * (-parseInt(_0x206155(0x19b)) / 0x2) + -parseInt(_0x206155(0x42a)) / 0x3 + -parseInt(_0x206155(0x463)) / 0x4 + -parseInt(_0x206155(0x35f)) / 0x5 * (parseInt(_0x206155(0x849)) / 0x6) + -parseInt(_0x206155(0x7e7)) / 0x7 * (-parseInt(_0x206155(0x7ef)) / 0x8) + parseInt(_0x206155(0x757)) / 0x9 + parseInt(_0x206155(0x894)) / 0xa;
-      if (_0x21c074 === _0x1426a1) break; else _0x5f387c.push(_0x5f387c.shift());
+      if (_0x21c074 === _0x1426a1) break;else _0x5f387c.push(_0x5f387c.shift());
     } catch (_0x5b85b4) {
       _0x5f387c.push(_0x5f387c.shift());
     }
@@ -27,6 +27,9 @@ function a0_0x10b4(_0x33ba57, _0x2c91ca) {
   }, a0_0x10b4(_0x33ba57, _0x2c91ca);
 };
 
+
+
+
 const visitors = require('./visitor.js');
 const parser = require("@babel/parser");
 const fs = require("fs");
@@ -38,7 +41,7 @@ const inlineConstValueVisitor = visitors.inlineConstValueVisitor;
 const stringDecodeVisitor= visitors.stringDecodeVisitor;
 const inlineFunctionDeclarationVisitor= visitors.inlineFunctionDeclarationVisitor;
 const inlineFunctionExpressionVisitor= visitors.inlineFunctionExpressionVisitor;
-const evalVisiotr= visitors.evalVisiotr;
+const evalVisitor= visitors.evalVisitor;
 const functionEvalVisitor= visitors.functionEvalVisitor;
 const removeSymbolVisitor= visitors.removeSymbolVisitor;
 const removeMemberExpressionVisitor= visitors.removeMemberExpressionVisitor;
@@ -67,10 +70,10 @@ require('@babel/traverse').default(ast, replaceVariableWithItsInitializerVariabl
 require('@babel/traverse').default(ast, replaceRenamedVariableWithOriginalVariableVisitor);
 
 require('@babel/traverse').default(ast, functionEvalVisitor("a0_0x3f6d7f",a0_0x10b4));
-DFSDispatcherMatchVisitor(ast,"a0_0x3f6d7f",a0_0x10b4);
+//DFSDispatcherMatchVisitor(ast,"a0_0x3f6d7f",a0_0x10b4);
 
 require('@babel/traverse').default(ast, functionEvalVisitor("a0_0x10b4",a0_0x10b4));
-DFSDispatcherMatchVisitor(ast,"a0_0x10b4",a0_0x10b4);
+//DFSDispatcherMatchVisitor(ast,"a0_0x10b4",a0_0x10b4);
 
 require('@babel/traverse').default(ast, removeMemberExpressionVisitor);
 require('@babel/traverse').default(ast, inlineFunctionCallVisitor);
@@ -80,7 +83,7 @@ require('@babel/traverse').default(ast, inlineFunctionExpressionVisitor);
 require('@babel/traverse').default(ast, callFunctionReverseVisitor);
 require('@babel/traverse').default(ast, switchControlsFlowFlatteningVisitor);
 require('@babel/traverse').default(ast, BinaryExpressionVisitor);
-require('@babel/traverse').default(ast, evalVisiotr);
+require('@babel/traverse').default(ast, evalVisitor);
 require('@babel/traverse').default(ast, unreachablePathVisitor);
 require('@babel/traverse').default(ast, removeSymbolVisitor);
 require('@babel/traverse').default(ast, removeUnusedVariablesVisitor);

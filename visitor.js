@@ -273,12 +273,18 @@ let result = 3;
 function functionEvalVisitor(funcName, func) {
     return {
         CallExpression(path) {
+            //console.log('Visiting node:', path.node); // Log the node being visited
             if (path.node.callee.type === "Identifier" && path.node.callee.name === funcName) {
+                console.log('Processing function call:', path.node.callee.name); // Log the function call being processed
                 removeReference(path);
-                const evaluate = path.get("arguments").map((path) => { return path.evaluate() });
+                const evaluate = path.get("arguments").map((path) => { 
+                    console.log('Evaluating argument:', path.node); // Log the argument being evaluated
+                    return path.evaluate() 
+                });
                 if (evaluate.every((eval) => { return eval.confident })) {
                     const args = evaluate.map((eval) => { return eval.value });
                     const value = func(...args);
+                    console.log('Function return value:', value); // Log the function return value
                     switch (typeof value) {
                         case "string":
                             path.replaceInline(types.stringLiteral(value));
@@ -377,6 +383,7 @@ function DFSDispatcherMatchVisitor(ast, dispatcherName, func, scope = null) {
 
 function DispatcherMatchVisitor(ast, dispatcherName) {
     let funcname = [];
+    console.log('Running DispatcherMatchVisitor for dispatcher:', dispatcherName); // Log the dispatcher being processed
     traverse(ast, {
         VariableDeclarator(path) {
             if (path.node.init && path.node.init.name === dispatcherName) {
@@ -384,13 +391,16 @@ function DispatcherMatchVisitor(ast, dispatcherName) {
             }
         }
     });
+    console.log('Found functions:', funcname); // Log the functions found
     return funcname;
 }
 
 function DFSDispatcherMatchVisitor(ast, dispatcherName, func) {
+    console.log('Running DFSDispatcherMatchVisitor for dispatcher:', dispatcherName); // Log the dispatcher being processed
     let funcname = DispatcherMatchVisitor(ast, dispatcherName)
     funcname.forEach(
         (name) => {
+            console.log('Processing function:', name); // Log the function being processed
             require('@babel/traverse').default(ast, functionEvalVisitor(name, func));
             DFSDispatcherMatchVisitor(ast, name, func);
         });
@@ -399,6 +409,7 @@ function DFSDispatcherMatchVisitor(ast, dispatcherName, func) {
     traverse(ast, {
         VariableDeclarator(path) {
             if (funcname.includes(path.node.id.name)) {
+                console.log('Removing function declaration:', path.node.id.name); // Log the function declaration being removed
                 removeReference(path);
                 path.remove();
             }
@@ -428,8 +439,13 @@ function DFSDispatcherMatchVisitor(ast, dispatcherName, func) {
  */
 const inlineFunctionExpressionVisitor = {
     CallExpression(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         if (path.node.callee.type === 'FunctionExpression' && hasSingleStatement(path.node.callee)) {
-            if (path.node.callee.id !== null) inlineNamedFunction(path.get("callee"));
+            if (path.node.callee.id !== null) {
+                console.log('Inlining named function:', path.node.callee.id); // Log the function being inlined
+                inlineNamedFunction(path.get("callee"));
+            }
+            console.log('Inlining function:', path.node.callee); // Log the function being inlined
             inlineFunction(path.get("callee"), path);
         }
     }
@@ -462,10 +478,12 @@ let result4 = "true branch";
 
 注意，`!false` 被替换为它的值 `true`，`1 + 2` 被替换为它的值 `3`，`Math.max(1, 2, 3)` 被替换为它的值 `3`，`true ? "true branch" : "false branch"` 被替换为它的值 `"true branch"`。
  */
-const evalVisiotr = {
+const evalVisitor = {
     "UnaryExpression|BinaryExpression|CallExpression|ConditionalExpression"(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         const { confident, value } = path.evaluate();
         if (confident) {
+            console.log('Replacing node with:', types.valueToNode(value)); // Log the node being replaced
             removeReference(path);
             path.replaceInline(types.valueToNode(value));
             path.skip();
@@ -499,6 +517,7 @@ console.log(usedVariable);
  */
 const removeSymbolVisitor = {
     VariableDeclarator(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         const binding = path.scope.getBinding(path.node.id.name);
         // 如标识符被修改过，则不能进行删除动作。
         if (!binding || binding.constantViolations.length > 0) {
@@ -506,6 +525,7 @@ const removeSymbolVisitor = {
         }
         // 未被引用
         if (!binding.referenced) {
+            console.log('Removing node:', path.node); // Log the node being removed
             path.remove();
         }
     }
@@ -664,7 +684,7 @@ console.log(function(x, y) { return x + y; });
  */
 const removeMemberExpressionVisitor = {
     MemberExpression(path) {
-        console.log('Visiting MemberExpression:', path.node);
+        //console.log('Visiting MemberExpression:', path.node);
         // Check if MemberExpression is in the left-hand side of an assignment
         if (path.parentPath.isAssignmentExpression() && path.parentPath.node.left === path.node) {
             console.log('Skipping processing for MemberExpression in the left-hand side of an assignment:', path.node);
@@ -865,14 +885,18 @@ console.log("True branch");
  */
 const unreachablePathVisitor = {
     "IfStatement|ConditionalExpression"(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         const { confident, value } = path.get("test").evaluate();
         if (confident) {
             if (value) {
+                console.log('Replacing node with:', path.node.consequent); // Log the node being replaced
                 replaceWith(path, types.cloneDeepWithoutLoc(path.node.consequent));
             } else {
                 if (path.node.alternate !== null) {
+                    console.log('Replacing node with:', path.node.alternate); // Log the node being replaced
                     replaceWith(path, types.cloneDeepWithoutLoc(path.node.alternate));
                 } else {
+                    console.log('Removing node:', path.node); // Log the node being removed
                     removeReference(path);
                     path.remove();
                 }
@@ -880,8 +904,10 @@ const unreachablePathVisitor = {
         }
     },
     WhileStatement(path) {
+        console.log('Visiting node:', path.node); // Log the node being visited
         const { confident, value } = path.get("test").evaluate();
         if (confident && value === false) {
+            console.log('Removing node:', path.node); // Log the node being removed
             removeReference(path);
             path.remove();
         }
@@ -924,6 +950,7 @@ let result = obj.add(1, 2);
  */
 const callFunctionReverseVisitor = {
     CallExpression(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         //callee可以为Expression | Super | V8IntrinsicIdentifier，这里只要MemberExpression
         if (path.node.callee.type === "MemberExpression") {
             const callee = path.node.callee;
@@ -931,7 +958,7 @@ const callFunctionReverseVisitor = {
                 callee.computed = false
                 const idxPath = path.get("callee.property")
                 replaceWith(idxPath, types.identifier(callee.property.value))
-                console.log("callFunctionReverseVisitor:" + path.node)
+                console.log('Replacing node callFunctionReverseVisitor'); // Log the node being replaced
             }
         }
     }
@@ -976,6 +1003,7 @@ while (true) {
  */
 const switchControlsFlowFlatteningVisitor = {
     WhileStatement(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         const { confident: whileConfident, value: whileValue } = path.get("test").evaluate();
         if (!(whileConfident === true && whileValue === true)) return;
         if (!(path.node.body.type === "BlockStatement")) return;
@@ -988,19 +1016,25 @@ const switchControlsFlowFlatteningVisitor = {
         if (!(listBinding.path.node.type === "VariableDeclarator" && listBinding.path.node.init !== null)) return;
         const { confident: listConfident, value: listValue } = listBinding.path.get("init").evaluate();
         if (!(listConfident === true && Array.isArray(listValue))) return;
-        const consequent = Object.fromEntries(switchBodyNode.cases.map(x => [x.test.value, x.consequent]));
+        const consequent = Object.fromEntries(switchBodyNode.cases.map(x => [x.test.value, x.consequent[0].type === "BlockStatement" ? x.consequent[0].body : x.consequent]));
         newCode = listValue.map(x => consequent[x]);
         if (newCode.some((x) => x === undefined)) return;
-        if (newCode.some((x) => x.at(-1).type !== "ContinueStatement")) return;
+        let returnStatement = null;
+        if (newCode.some((x) => x.at(-1).type === "ReturnStatement")) {
+            returnStatement = newCode.find((x) => x.at(-1).type === "ReturnStatement").at(-1);
+        }
+        if (newCode.some((x) => x.at(-1).type !== "ContinueStatement" && x.at(-1).type !== "ReturnStatement")) return;
         newCode = newCode.map((x) => x.slice(0, -1));
         newCode = newCode.flat();
         newCode = newCode.map((x) => types.cloneDeepWithoutLoc(x));
+        if (returnStatement) {
+            newCode.push(returnStatement);
+        }
         newCodeStatement = types.blockStatement(newCode);
         replaceWith(path, newCodeStatement);
-        console.log("switchControlsFlowFlatteningVisitor:" + path.node)
-    }
+        console.log("switchControlsFlowFlatteningVisitor: Replaced node with:", newCodeStatement); // Log the node being replaced
+   }
 }
-
 /**
  * 这个 `inlineConstValueVisitor` 函数处理的是那些定义了常量值并在后续代码中使用这些常量的变量声明。如果一个变量声明的类型是 `const`，并且它的初始值是一个字面量或者一个标识符，那么这个变量声明就会被处理。
 
@@ -1021,6 +1055,7 @@ let area = 3.14159 * r * r;
  */
 const inlineConstValueVisitor = {
     VariableDeclaration(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         if (path.node.kind !== "const") return;
         // declarations: Array<VariableDeclarator> (required)
         path.get("declarations").forEach(function (path) {
@@ -1030,11 +1065,12 @@ const inlineConstValueVisitor = {
             if (binding) {
                 console.log("inlineConstValue:" + path.node)
                 binding.referencePaths.slice().forEach(function (_path) {
+                    console.log('Replacing node with:', path.node.init); // Log the node being replaced
                     replaceWith(_path, types.cloneDeepWithoutLoc(path.node.init));
                 });
             }
             else {
-                console.log(path.node.id)
+                console.log('No binding found for:', path.node.id) // Log when no binding is found
             }
             removeReference(path);
             path.remove();
@@ -1065,6 +1101,7 @@ let result = 1 + 2;
  */
 const BinaryExpressionVisitor = {
     CallExpression(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         if (types.isFunctionExpression(path.node.callee)) {
             const func = path.node.callee;
             const args = path.node.arguments;
@@ -1076,6 +1113,7 @@ const BinaryExpressionVisitor = {
                     args[0],
                     args[1]
                 );
+                console.log('Replacing node with:', inlineExpression); // Log the node being replaced
                 console.log("BinaryExpressionVisitor:" + path.node)
                 path.replaceWith(inlineExpression);
             }
@@ -1119,12 +1157,14 @@ let result = 1 + 2;
  */
 const inlineKVBinaryExpressionVisitor = {
     VariableDeclarator(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         path.traverse({
             ObjectProperty(innerPath) {
                 if (types.isFunctionExpression(innerPath.node.value)) {
                     innerPath.traverse({
                         AssignmentExpression(deepestPath) {
                             if (types.isFunctionExpression(deepestPath.node.right) && types.isBinaryExpression(deepestPath.node.right.body.body[0].argument)) {
+                                console.log('Found function definition:', deepestPath.node.left.property.value); // Log the function definition
                                 functionDefinitions[deepestPath.node.left.property.value] = deepestPath.node.right.body.body[0].argument.operator;
                                 deepestPath.remove();
                             }
@@ -1198,6 +1238,7 @@ console.log(2);
  */
 const arrayIndexVisitor = {
     MemberExpression(path) {
+        //console.log('Visiting node:', path.node); // Log the node being visited
         if (!path.parentPath.isAssignmentExpression({ left: path.node })) {
             if (types.isNumericLiteral(path.node.property)) {
                 const binding = path.scope.getBinding(path.node.object.name);
@@ -1207,6 +1248,7 @@ const arrayIndexVisitor = {
                         const index = path.node.property.value;
                         const element = arrayPath.node.init.elements[index];
                         if (element) {
+                            console.log('Replacing node with:', element); // Log the node being replaced
                             path.replaceWith(types.cloneDeep(element));
                         }
                     }
@@ -1510,4 +1552,4 @@ const replaceRenamedVariableWithOriginalVariableVisitor = {
     }
 };
 
-module.exports = { replaceRenamedVariableWithOriginalVariableVisitor,mergeObjectInitializationVisitor,replaceVariableWithItsInitializerVariableVisitor, removeUnusedVariablesVisitor, inlineFunctionCallVisitor, constructFuncToClassVisitor, inlineLiteralVisitor, marshalObjectVisitor, arrayIndexVisitor, UnicodeVisitor, inlineKVExpressionVisitor: inlineKVBinaryExpressionVisitor, BinaryExpressionVisitor, stringDecodeVisitor, inlineFunctionDeclarationVisitor, inlineFunctionExpressionVisitor, evalVisiotr, functionEvalVisitor, removeSymbolVisitor, removeMemberExpressionVisitor, removeMemberExpressionVisitorV2, unreachablePathVisitor, callFunctionReverseVisitor, switchControlsFlowFlatteningVisitor, inlineConstValueVisitor, DFSDispatcherMatchVisitor }
+module.exports = { replaceRenamedVariableWithOriginalVariableVisitor,mergeObjectInitializationVisitor,replaceVariableWithItsInitializerVariableVisitor, removeUnusedVariablesVisitor, inlineFunctionCallVisitor, constructFuncToClassVisitor, inlineLiteralVisitor, marshalObjectVisitor, arrayIndexVisitor, UnicodeVisitor, inlineKVExpressionVisitor: inlineKVBinaryExpressionVisitor, BinaryExpressionVisitor, stringDecodeVisitor, inlineFunctionDeclarationVisitor, inlineFunctionExpressionVisitor, evalVisitor, functionEvalVisitor, removeSymbolVisitor, removeMemberExpressionVisitor, removeMemberExpressionVisitorV2, unreachablePathVisitor, callFunctionReverseVisitor, switchControlsFlowFlatteningVisitor, inlineConstValueVisitor, DFSDispatcherMatchVisitor }
