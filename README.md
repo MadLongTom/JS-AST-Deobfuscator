@@ -61,31 +61,38 @@ console.log(true);
 
 注意，`str` 被替换为它的值 `"Hello, world!"`，`num` 被替换为它的值 `42`，`bool` 被替换为它的值 `true`。
 ## functionEvalVisitor
-`functionEvalVisitor` 函数处理的是那些调用特定函数的代码块。
-如果一个函数调用的调用者是一个标识符，并且这个标识符的名称与给定的函数名称相同，那么这个函数调用就会被处理。
+`functionEvalVisitor` 函数用于处理复杂求值计算（如处理加密字符串），该Visitor需要提供需要被求值的函数名称以及用于求值的函数。
 
 以下是一个会被这个函数处理的示例：
 
 ```javascript
-function add(x, y) {
-    return x + y;
+var stringTable = ['string']
+function loadString(idx) {
+    //Some code used for anti debugging
+    //...
+    //Complex function processing
+    //...
+    return stringTable[idx];
 }
 
-let result = add(1, 2);
+let result = loadString(0);
 ```
 
-在这个例子中，`add(1, 2)` 是一个函数调用，它的调用者是一个标识符 `add`，这个标识符的名称与给定的函数名称 `add` 相同，因此这个函数调用会被处理。
-因此，`functionEvalVisitor` 函数会将这个函数调用替换为它的返回值，如下所示：
+通过`traverse(ast, functionEvalVisitor("loadString",(idx)=>['string'][idx]))`的方式调用`functionEvalVisitor`，可以把示例程序中的`loadString`函数调用都替换为`(idx)=>['string'][idx]`函数计算的结果。
+因此处理后的函数结果如下：
 
 ```javascript
-function add(x, y) {
-    return x + y;
+var stringTable = ['string'];
+function loadString(idx) {
+  //Some code used for anti debugging
+  //...
+  //Complex function processing
+  //...
+  return stringTable[idx];
 }
-
-let result = 3;
+let result = "string";
 ```
 
-注意，`add(1, 2)` 被替换为它的返回值 `3`。
 ## DispatcherMatchExpressionVisitor
 `DispatcherMatchExpressionVisitor` 函数处理的是那些包含特定表达式的抽象语法树（AST）。
 如果一个变量声明的初始化表达式与给定的目标表达式相同，那么这个变量声明就会被处理。
