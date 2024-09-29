@@ -246,7 +246,9 @@ let obj = {
   }
 };
 console.log("Hello, world!");
-console.log(1 + 2);
+console.log(function (x, y) {
+  return x + y;
+}(1, 2));
 ```
 
 注意，`obj["message"]` 被替换为它的值 `"Hello, world!"`，`obj["add"](1, 2)` 被替换为它的值 `1 + 2`。
