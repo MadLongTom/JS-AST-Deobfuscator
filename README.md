@@ -259,17 +259,21 @@ if (true) {
     console.log("False branch");
 }
 
+let num = true?1:2;
+
 while (false) {
     console.log("Loop body");
 }
 ```
 
 在这个例子中，`if (true) { ... } else { ... }` 是一个 if 语句，它的测试条件 `true` 可以确定为真，因此这个 if 语句会被处理。
+`let num = true?1:2`中三木运算符因同样属于条件判断语句而会被化简。
 `while (false) { ... }` 是一个 while 语句，它的测试条件 `false` 可以确定为假，因此这个 while 语句会被处理。
 因此，`unreachablePathVisitor` 函数会将这些语句替换或删除，如下所示：
 
 ```javascript
 console.log("True branch");
+let num = 1;
 ```
 
 注意，原来的 if 语句被替换为它的真分支，而原来的 while 语句被删除，因为它的测试条件为假，所以它的主体是不可达的。
