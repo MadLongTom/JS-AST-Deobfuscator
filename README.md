@@ -239,11 +239,17 @@ console.log(obj["add"](1, 2));
 因此，`removeMemberExpressionVisitor` 函数会将这些对象属性访问替换为它们的值，如下所示：
 
 ```javascript
+let obj = {
+  "message": "Hello, world!",
+  "add": function (x, y) {
+    return x + y;
+  }
+};
 console.log("Hello, world!");
-console.log(function(x, y) { return x + y; });
+console.log(1 + 2);
 ```
 
-注意，`obj["message"]` 被替换为它的值 `"Hello, world!"`，`obj["add"](1, 2)` 被替换为它的值 `function(x, y) { return x + y; }`。
+注意，`obj["message"]` 被替换为它的值 `"Hello, world!"`，`obj["add"](1, 2)` 被替换为它的值 `1 + 2`。
  
  ## unreachablePathVisitor
  `unreachablePathVisitor` 函数处理的是那些包含不可达路径的 if 语句、条件表达式和 while 语句。
