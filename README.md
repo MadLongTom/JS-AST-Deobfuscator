@@ -244,7 +244,7 @@ console.log(function(x, y) { return x + y; });
 ```
 
 注意，`obj["message"]` 被替换为它的值 `"Hello, world!"`，`obj["add"](1, 2)` 被替换为它的值 `function(x, y) { return x + y; }`。
- */
+ 
  ## unreachablePathVisitor
  `unreachablePathVisitor` 函数处理的是那些包含不可达路径的 if 语句、条件表达式和 while 语句。
 如果一个 if 语句或条件表达式的测试条件可以确定为真或假，那么这个 if 语句或条件表达式就会被处理。
