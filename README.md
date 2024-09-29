@@ -2,36 +2,40 @@
  A deobfuscate babel visitor. 基于babel的反混淆访问器
 # Visitors
 ## inlineFunctionDeclarationVisitor
-`inlineFunctionDeclarationVisitor` 函数处理的是那些定义了函数但没有被引用的函数声明。
-如果一个函数声明的标识符在其父作用域中没有被引用，那么这个函数声明就会被处理。
+`inlineFunctionDeclarationVisitor` 函数将会尝试内联一些行为简单的函数，当函数没有被引用时将会将函数删除。
 
 以下是一个会被这个函数处理的示例：
 
 ```javascript
-function add(x, y) {
-    return x + y;
-}
-
-function subtract(x, y) {
+function noReferenceFunction(x, y) {
     return x - y;
 }
 
-let result = add(1, 2);
-```
-
-在这个例子中，`function add(x, y) { return x + y; }` 和 `function subtract(x, y) { return x - y; }` 是函数声明，它们的标识符分别是 `add` 和 `subtract`。`add` 在其父作用域中被引用，
-因此 `function add(x, y) { return x + y; }` 不会被处理。`subtract` 在其父作用域中没有被引用，因此 `function subtract(x, y) { return x - y; }` 会被处理。
-因此，`inlineFunctionDeclarationVisitor` 函数会移除 `function subtract(x, y) { return x - y; }`，如下所示：
-
-```javascript
-function add(x, y) {
+function simpleFunction(x, y) {
     return x + y;
 }
+let simpleFunctionResult = simpleFunction(1, 2);
 
-let result = add(1, 2);
+function complexFunction(x,y){
+    x = x + 1;
+    return x + y;
+}
+let complexFunctionResult = complexFunction(1, 2);
 ```
 
-注意，`function subtract(x, y) { return x - y; }` 被移除了。
+在这个例子中，`function noReferenceFunction(x, y) { return x - y; }` 、 `function simpleFunction(x, y) { return x + y; }` 和 `function complexFunction(x,y){ x = x + 1; return x + y; }`是函数声明，它们的标识符分别是 `noReferenceFunction` 、 `simpleFunction` 和 `complexFunction` 。
+
+其中`noReferenceFunction`在代码中没有被引用，因此将会被移除。`simpleFunction` 只用一条`return`语句，因此被认定为是简单的函数，此函数将会被内联到`simpleFunctionResult`，在内联后`simpleFunction`将不再具有引用而被移除。`complexFunction`具有两条及以上语句，因此被认定为是复杂的函数，不适合进行内联，因此将会不做修改。最后结果如下所示：
+
+```javascript
+let simpleFunctionResult = 1 + 2;
+function complexFunction(x, y) {
+  x = x + 1;
+  return x + y;
+}
+let complexFunctionResult = complexFunction(1, 2);
+```
+
 ## inlineLiteralVisitor
 `inlineLiteralVisitor` 函数处理的是那些包含特定字面量的代码块。如果一个变量声明的初始化表达式是一个字符串字面量、数字字面量或布尔字面量，并且这个变量声明不在循环体内，那么这个变量声明就会被处理。
 
