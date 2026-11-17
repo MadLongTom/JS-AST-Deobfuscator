@@ -78,7 +78,7 @@ API 和 JSON 配置还可设置静态解码上限：`maxDecoderOperations`（默
 
 `safe` 使用保守的静态变换，保留未证明可删除的脚本顶层绑定和源码自检代码。它适合先观察字符串解码、常量以及可证明的控制流和语句简化结果。格式变化本身仍可能触发依赖函数 `toString()` 的自检，因此它也不等同于运行时等价证明。
 
-`readable` 适合人工审阅：在局部语句和控制流变换之外，可清理符合条件的混淆器辅助族，并明确中和已识别的源码自检。该配置允许改变这些防护代码的行为；相关动作会记录在报告诊断中。它不会执行输入，也不会恢复原始变量名。真实样本的输出应作为分析材料，不能直接视为可替换线上脚本的产物。
+`readable` 适合人工审阅：在局部语句和控制流变换之外，可清理符合条件的混淆器辅助族，并明确中和已识别的源码自检。该配置允许改变这些防护代码的行为；相关动作会记录在报告诊断中。它不会执行输入，也不会恢复原始变量名。生成结果用于代码分析，替换原程序前仍需验证行为。
 
 显式 `passes` 始终按给定列表执行。选择 `readable` 并不让工具任意删除动态逻辑，无法证明或未识别的形态仍需保留并检查报告。
 
@@ -88,7 +88,7 @@ API 和 JSON 配置还可设置静态解码上限：`maxDecoderOperations`（默
 
 动态作用域按绑定及变换位置检查。无关模块中的 `eval` 不再让整个文件停止优化；可见祖先绑定、`with` 和未知动态代码仍受保护。对 JSON2 兼容解析器，仅在匹配完整固定正则链、字符串强制转换、规范转义及无污染内建方法时，才能证明该处 `eval` 只求值 JSON 数据表达式。原解析器和 `eval` 保留在输出中。
 
-旧式播放器有时直接使用 `eval('(' + response.responseText + ')')` 或独立语句 `eval('var data=' + text)` 解析数据，没有 JSON2 的完整校验链。若调用方已核实这些入口的数据契约，可显式设置 `assumeDataEval: true`（CLI `--assume-data-eval`），与 `profile: 'readable'` 一起使用。工具只按已识别形状采用这个契约假设，不会证明网络响应安全，不执行输入，也不把原调用替换成 `JSON.parse`。
+旧式数据解析代码可能直接使用 `eval('(' + response.responseText + ')')` 或独立语句 `eval('var data=' + text)`，没有 JSON2 的完整校验链。若调用方已核实这些入口的数据契约，可显式设置 `assumeDataEval: true`（CLI `--assume-data-eval`），与 `profile: 'readable'` 一起使用。工具只按已识别形状采用这个契约假设，不会证明网络响应安全，不执行输入，也不把原调用替换成 `JSON.parse`。
 
 括号表达式与单变量 `var` 声明分别处理。`var d`、`var data`、`var subs` 等形态仍会引入或修改名字：对应绑定、整个变量作用域内的路径和移动区域继续受保护；静态字符串解码使用单独的纯字面替换检查，避免为了解码而放开任意代码移动。未知 `eval` 和 `with` 不受该选项豁免。逐站点的原始位置、`introducedNames` 和 `proven: false` 写入 `report.assumptions`，并产生 `ASSUMED_DATA_EVAL` 诊断。默认模式与 JSON2 的自动证明规则保持不变。详细形状、限制和使用示例见 [数据 eval 假设](docs/data-eval.md)。
 
@@ -101,8 +101,6 @@ node scripts/extract-modules.cjs named.js artifacts/modules
 ```
 
 `index.json` 记录入口、模块编号、静态依赖和完整 bundle 行号。各 factory 摘录依赖原闭包，仅供阅读，不能独立执行。
-
-仓库固定了一份易盾 `2.28.5` 静态回归样本，来源、时间及 SHA-256 见 `test/fixtures/netease-core-2.28.5.metadata.json`。运行 `npm run sample:yidun` 可在 `artifacts/yidun-core-2.28.5/` 重现完整输出、Source Map、变换报告、前后指标和模块阅读摘录。真实 SDK 不参与运行时测试，也不发起验证码请求。
 
 ## 可选 class 重建
 
@@ -124,14 +122,18 @@ console.log(result.report.modernization);
 
 报告中的 `modernization` 包括 `classesConverted`、`prototypeMethodsConverted`、`staticMethodsConverted`、`converted` 和 `skipped`。`converted` 记录名称、原始位置、放置位置、方法数、别名和假设；`skipped` 记录保留的构造函数及原因。反混淆计数仍在 `totals.changes`，class 阶段单独计入 `totals.modernizationChanges`。
 
-主要 pass：
+prototype 访问本身不等于混淆。运行时方法选择、共享原型数据、继承和属性描述符操作，以及 `Object.prototype` 调用都可能具有语义用途，不能仅为减少 `.prototype` 文本而移除。
+
+## 内置变换
 
 | pass | 主要能力 |
 | --- | --- |
 | `normalize-literals` | 规范数字、字符串和合法的计算属性写法 |
 | `decode-string-arrays` | 静态识别字符串表、索引偏移、别名、部分 Base64/RC4 解码和旋转表 |
+| `decode-substituted-hex` | 解码已识别的十六字符替换编码与不可变 primitive 数组的静态索引 |
 | `constant-fold` | 折叠可证明的 primitive 常量表达式 |
 | `inline-constants` | 内联已初始化且不变的私有常量 |
+| `inline-aliases` | 展开已初始化且不变的私有标识符别名，保留作用域与间接 eval 语义 |
 | `inline-objects` | 简化无写入、无逃逸的私有对象属性和简单分发表 |
 | `inline-wrappers` | 展开参数表达式和调用代理，保留动态实参的求值顺序、次数与接收者语义 |
 | `control-flow` | 还原受限的字符串顺序表 + `while/switch` 调度器 |
@@ -161,47 +163,14 @@ const result = deobfuscate(source, {
 
 `run` 必须同步返回非负整数。未指定 `passes` 时，自定义 pass 追加到默认管线；显式指定时，只运行列表中的 pass。名称需唯一并采用小写连字符格式。`context.options` 提供规范化选项，`context.warn(code, message, details?)` 将警告写入报告。自定义 pass 是本机受信任代码，应自行遵守静态处理原则；JSON 配置不加载可执行插件。
 
-## 报告和真实样本
+## 变换报告
 
 报告包含 `profile`、输入/输出的 UTF-8 字节数及 SHA-256、每轮每个 pass 的修改数和耗时、收敛状态及诊断。`residuals.before` / `residuals.after` 比较 AST 节点、混淆命名绑定、别名、调度循环、代理函数候选、逗号/条件表达式和源码自检特征的数量。达到迭代上限或检测到循环时停止并报告。`changes` 和残留计数是静态分析指标，不代表还原比例。
 
-超星播放器样本的复现入口为 `npm run sample:chaoxing`，对应 `scripts/chaoxing-sample.cjs`。它从仓库内固定的原始视频入口和 Video.js 扩展生成显式数据 eval 假设下的 readable 产物，默认写到 `artifacts/chaoxing/`，包括完整代码、Source Map、报告及转换前后残留审计。运行方法和样本来源见 [超星样本复现](docs/data-eval.md#超星样本复现)。输出用于代码审阅；字符串调用清零、重新解析通过或指标下降都不构成全程序等价证明，也不表示恢复了原始名称。
-
-```sh
-npm run sample
-```
-
-该命令静态处理 `test/fixtures/zhihuishu-2.obfuscated.js`，在 `artifacts/` 写出 `zhihuishu-2.readable.js`、对应 Source Map 和 `.readable.report.json`；`zhihuishu-2.comparison.json` 依据固定基线摘要对比新结果的静态指标。基线摘要保存在 [baseline 元数据](test/fixtures/zhihuishu-2.baseline.json)。样本来自智慧树网站的 `2.js` 快照，来源、抓取日期和 SHA-256 记录于 [fixture 元数据](test/fixtures/zhihuishu-2.metadata.json)。测试只转换和重新解析该文件，**不会执行它**。语义对比测试中的 `node:vm` 仅运行仓库内手写的受信任短程序。
-
-同时生成 `zhihuishu-2.business.js` 与 `zhihuishu-2.libraries.js`：按已识别的 UMD 结构分开业务定义与 CryptoJS/JSEncrypt，便于人工阅读。这两份是分析摘录，保留原文件执行顺序的完整产物是 `.readable.js`；摘录不是独立可运行模块。原样本命令使用的 `zhihuishu-2.js` 和 `.report.json` 路径也会更新。
-
-样本命令还会从同一原始 fixture 独立启用 class 重建，新增 `zhihuishu-2.classes.js`、`.classes.js.map`、`.classes.report.json` 和 `.classes.comparison.json`，并保留前述输出。class 版 Source Map 指向原 fixture。`zhihuishu-2.class-preview.js` 摘出完整的 `pt`/JSEncrypt class，保留实际名称，并标注它在完整 class 文件中的行号；该摘录依赖外层闭包，**不能独立运行**。比较报告列出 class/方法语法数量、剩余 prototype 赋值，以及转换和跳过记录。
-
-另有 `zhihuishu-2.big-integer-preview.js` 与 `zhihuishu-2.rsa-preview.js`。前者展示完整的 `O`/BigInteger class，并附环境选择 `am` 和六项共享原型数据的完整原位初始化语句；后者同时展示 `nt` 父类与 `lt extends nt` 子类。同样保留原名称、完整文件位置和非独立运行说明。BigInteger 摘录中把分散的段落并排展示只为阅读，不能据此把运行时初始化提前到 class 声明之后。
-
-`zhihuishu-2.prototype-inventory.json` 全量盘点 readable 与 class 两版的 prototype 用法：文本出现次数、AST 成员访问、直接/条件方法安装、共享原型数据写入、整体原型替换、内建或动态读/调用，并按构造器族列出数量与行号。类内 `static` 块与类外位置分别计数。此样本的 `am` 三分支和六项数据保持原初始化位置，通过 `runtimeInstallationsRetained` 等记录解释保留原因，避免改变 `navigator`、`ot` 和别名 `A` 的时序。它也对照固定的 [2.2.0 class 基线](test/fixtures/zhihuishu-2.classes-baseline.json)；旧输出保留在 `artifacts/v2.2.0/`。
-
-prototype 访问本身不等于混淆。BigInteger 的环境选择方法和共享常量、CryptoJS 的委托对象模型、通用继承/描述符操作及 `Object.prototype` 调用都有语义用途；这些应保留或在 class 内集中表达。覆盖率针对可合并的直接方法安装，不以消除所有 `.prototype` 文本为目标。
-
-当前固定样本的 class 覆盖对比：
-
-| 指标 | 2.2.0 class 基线 | 当前 class 结果 |
-| --- | ---: | ---: |
-| 生成 class | 6 | 14 |
-| 转为 class 的原型方法 | 41 | 152 |
-| 转为 class 的静态方法 | 2 | 5 |
-| 类外 prototype 函数赋值 | 114 | 3（运行时 `am` 选择） |
-| AST prototype 成员访问 | 139 | 25 |
-| 字面文本 `.prototype.` | 126 | 15 |
-
-readable 版中的 152 处直接方法安装已全部集中到 class。余下 25 处 AST 访问分类为 3 处条件函数安装、9 处数据赋值、5 处整体原型替换和 8 处读/调用，均可在 inventory 中逐条定位；没有未解释的直接方法安装大簇。`x/I/P/q/L/O/nt/lt` 已覆盖，其中 `lt extends nt`；BigInteger 的三种 `am` 实现和共享数据仍按原环境与时序初始化。
-
-真实样本测试还要求至少解析 1200 处字符串调用，并检查关键 URL 和 `aesUtil.encrypt` 可读访问，防止仅重新排版也被误判为成功。这些是静态回归指标，不证明真实网站样本的运行时行为完全等价。
-
-当前固定快照的静态比较：旧结果中的 3 个调度循环降为 0，代理函数候选从 309 降为 4，混淆命名别名声明从 197 降为 9，混淆命名绑定从 1525 降为 365。测试还检查 `labc` 的 AJAX 参数和 Promise 回调直调、伪分支移除，以及 `yxyz` 返回 `aesUtil.encrypt`。余下 4 个候选位于 JSEncrypt，分别返回 `t & e`、`t | e`、`t ^ e`、`t & ~e`，是库的位运算辅助函数，保留其函数值用途。数字代表模式匹配结果，不代表未还原的业务功能数量。
+通过 CLI 的 `--report <path>` 保存 JSON 报告，或从 API 返回值读取 `report`。启用可选功能后，可在 `assumptions` 中查看数据 eval 的契约假设，在 `readability` 中查看绑定命名映射，在 `modernization` 中查看 class 转换与跳过原因。
 
 ## 旧版本和许可
 
 2.x 使用统一的 `deobfuscate()` / CLI 接口。原 `main.js`、`visitor.js` 保存在 `legacy/`，旧输入输出保存在 `examples/legacy/`，供历史参考；旧 visitor API 不属于新运行入口。仓库根目录 `main.js` 是新 CLI 的兼容启动入口。
 
-项目沿用 [MadLongTom/JS-AST-Deobfuscator](https://github.com/MadLongTom/JS-AST-Deobfuscator) 的 MIT 许可，保留 `Copyright (c) 2024 MadLongTom`，见 [LICENSE](LICENSE)。第三方网站样本及其内嵌库保留原权利和许可声明，不因收录为测试 fixture 而改为本项目的 MIT 许可。
+项目沿用 [MadLongTom/JS-AST-Deobfuscator](https://github.com/MadLongTom/JS-AST-Deobfuscator) 的 MIT 许可，保留 `Copyright (c) 2024 MadLongTom`，见 [LICENSE](LICENSE)。
