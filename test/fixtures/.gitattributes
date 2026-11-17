@@ -1,0 +1,2 @@
+# Preserve the exact bytes covered by the fixture metadata SHA-256.
+*.obfuscated.js -text

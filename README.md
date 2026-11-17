@@ -1,550 +1,207 @@
 # JS-AST-Deobfuscator
- A deobfuscate babel visitor. 基于babel的反混淆访问器
-# Visitors
-## inlineFunctionDeclarationVisitor
-`inlineFunctionDeclarationVisitor` 函数将会尝试内联一些行为简单的函数，当函数没有被引用时将会将函数删除。
 
-以下是一个会被这个函数处理的示例：
+基于 Babel 的 JavaScript 静态反混淆工具。解析源码、按作用域执行多轮 AST 变换，再生成可读代码、Source Map 和 JSON 报告。输入代码不会被 `eval`、`Function` 或 `vm` 执行。
 
-```javascript
-function noReferenceFunction(x, y) {
-    return x - y;
-}
+需要 **Node.js 20.19+**。在仓库目录安装和检查：
 
-function simpleFunction(x, y) {
-    return x + y;
-}
-let simpleFunctionResult = simpleFunction(1, 2);
-
-function complexFunction(x,y){
-    x = x + 1;
-    return x + y;
-}
-let complexFunctionResult = complexFunction(1, 2);
+```sh
+npm ci
+npm run lint
+npm test
 ```
 
-在这个例子中，`function noReferenceFunction(x, y) { return x - y; }` 、 `function simpleFunction(x, y) { return x + y; }` 和 `function complexFunction(x,y){ x = x + 1; return x + y; }`是函数声明，它们的标识符分别是 `noReferenceFunction` 、 `simpleFunction` 和 `complexFunction` 。
+## 命令行
 
-其中`noReferenceFunction`在代码中没有被引用，因此将会被移除。`simpleFunction` 只用一条`return`语句，因此被认定为是简单的函数，此函数将会被内联到`simpleFunctionResult`，在内联后`simpleFunction`将不再具有引用而被移除。`complexFunction`具有两条及以上语句，因此被认定为是复杂的函数，不适合进行内联，因此将会不做修改。最后结果如下所示：
-
-```javascript
-let simpleFunctionResult = 1 + 2;
-function complexFunction(x, y) {
-  x = x + 1;
-  return x + y;
-}
-let complexFunctionResult = complexFunction(1, 2);
+```sh
+node bin/js-ast-deobfuscator.js input.js -o safe.js --report safe.report.json --source-map
+node bin/js-ast-deobfuscator.js input.js --profile readable -o readable.js --report readable.report.json
+node bin/js-ast-deobfuscator.js input.js --profile readable --rename -o named.js --report named.report.json
+node bin/js-ast-deobfuscator.js input.js --profile readable --assume-data-eval --rename -o data-readable.js --report data-readable.report.json --source-map
+node bin/js-ast-deobfuscator.js input.js --profile readable --modernize class -o classes.js --report classes.report.json
+node bin/js-ast-deobfuscator.js input.js --passes normalize-literals,constant-fold --max-iterations 3
+node bin/js-ast-deobfuscator.js --list-passes
+node bin/js-ast-deobfuscator.js --help
 ```
 
-## inlineLiteralVisitor
-`inlineLiteralVisitor` 函数处理的是那些包含特定字面量的代码块。如果一个变量声明的初始化表达式是一个字符串字面量、数字字面量或布尔字面量，并且这个变量声明不在循环体内，那么这个变量声明就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let str = "Hello, world!";
-let num = 42;
-let bool = true;
-
-console.log(str);
-console.log(num);
-console.log(bool);
-```
-
-在这个例子中，`let str = "Hello, world!";`、`let num = 42;` 和 `let bool = true;` 是变量声明，它们的初始化表达式分别是一个字符串字面量 `"Hello, world!"`、一个数字字面量 `42` 和一个布尔字面量 `true`，并且这些变量声明不在循环体内，因此这些变量声明会被处理。因此，`inlineLiteralVisitor` 函数会将这些变量声明替换为它们的值，如下所示：
-
-```javascript
-console.log("Hello, world!");
-console.log(42);
-console.log(true);
-```
-
-注意，`str` 被替换为它的值 `"Hello, world!"`，`num` 被替换为它的值 `42`，`bool` 被替换为它的值 `true`。
-## functionEvalVisitor
-`functionEvalVisitor` 函数用于处理复杂求值计算（如处理加密字符串），该Visitor需要提供需要被求值的函数名称以及用于求值的函数。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-var stringTable = ['string']
-function loadString(idx) {
-    //Some code used for anti debugging
-    //...
-    //Complex function processing
-    //...
-    return stringTable[idx];
-}
-
-let result = loadString(0);
-```
-
-通过`traverse(ast, functionEvalVisitor("loadString",(idx)=>['string'][idx]))`的方式调用`functionEvalVisitor`，可以把示例程序中的`loadString`函数调用都替换为`(idx)=>['string'][idx]`函数计算的结果。
-因此处理后的函数结果如下：
-
-```javascript
-var stringTable = ['string'];
-function loadString(idx) {
-  //Some code used for anti debugging
-  //...
-  //Complex function processing
-  //...
-  return stringTable[idx];
-}
-let result = "string";
-```
-
-## DispatcherMatchExpressionVisitor
-`DispatcherMatchExpressionVisitor` 函数处理的是那些包含特定表达式的抽象语法树（AST）。
-如果一个变量声明的初始化表达式与给定的目标表达式相同，那么这个变量声明就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let targetFunction = function() {
-    console.log("This is the target function.");
-};
-
-let nonTargetFunction = function() {
-    console.log("This is not the target function.");
-};
-```
-
-在这个例子中，`let targetFunction = function() { console.log("This is the target function."); };` 是一个变量声明，它的初始化表达式 `function() { console.log("This is the target function."); }` 与给定的目标表达式相同，因此这个变量声明会被处理。
-`let nonTargetFunction = function() { console.log("This is not the target function."); };` 是另一个变量声明，它的初始化表达式 `function() { console.log("This is not the target function."); }` 与给定的目标表达式不同，因此这个变量声明不会被处理。
-
-如果我们将 `function() { console.log("This is the target function."); }` 作为目标表达式传递给 `DispatcherMatchExpressionVisitor` 函数，那么它会返回一个包含 `targetFunction` 的数组，如下所示：
-
-```javascript
-["targetFunction"]
-```
-
-注意，`DispatcherMatchExpressionVisitor` 函数会遍历抽象语法树（AST），找到所有初始化表达式与给定的目标表达式相同的变量声明，然后返回这些变量声明的标识符名称。
-## inlineFunctionExpressionVisitor
-`inlineFunctionExpressionVisitor` 函数处理的是那些直接调用函数表达式的代码块。如果一个函数调用的调用者是一个函数表达式，并且这个函数表达式的体只有一个语句，那么这个函数调用就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-(function(x, y) {
-    return x + y;
-})(1, 2);
-```
-
-在这个例子中，`(function(x, y) { return x + y; })(1, 2)` 是一个函数调用，它的调用者是一个函数表达式 `function(x, y) { return x + y; }`，这个函数表达式的体只有一个语句 `return x + y;`。因此，`inlineFunctionExpressionVisitor` 函数会将这个函数调用替换为它的返回值，如下所示：
-
-```javascript
-1 + 2;
-```
-
-注意，`(function(x, y) { return x + y; })(1, 2)` 被替换为它的返回值 `1 + 2`。
-## evalVisitor
-`evalVisitor` 函数处理的是那些包含一元表达式、二元表达式、函数调用和条件表达式的代码块。如果一个表达式的值可以确定，那么这个表达式就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let result1 = !false;
-let result2 = 1 + 2;
-let result3 = Math.max(1, 2, 3);
-let result4 = true ? "true branch" : "false branch";
-```
-
-在这个例子中，`!false` 是一个一元表达式，它的值可以确定为 `true`，因此这个一元表达式会被处理。
-`1 + 2` 是一个二元表达式，它的值可以确定为 `3`，因此这个二元表达式会被处理。
-`Math.max(1, 2, 3)` 是一个函数调用，它的值可以确定为 `3`，因此这个函数调用会被处理。
-`true ? "true branch" : "false branch"` 是一个条件表达式，它的值可以确定为 `"true branch"`，因此这个条件表达式会被处理。
-因此，`evalVisitor` 函数会将这些表达式替换为它们的值，如下所示：
-
-```javascript
-let result1 = true;
-let result2 = 3;
-let result3 = 3;
-let result4 = "true branch";
-```
-
-注意，`!false` 被替换为它的值 `true`，`1 + 2` 被替换为它的值 `3`，`Math.max(1, 2, 3)` 被替换为它的值 `3`，`true ? "true branch" : "false branch"` 被替换为它的值 `"true branch"`。
-## removeSymbolVisitor
-`removeSymbolVisitor` 函数处理的是那些包含未被引用的变量声明的代码块。
-如果一个变量声明的标识符没有被修改过，并且没有被引用，那么这个变量声明就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let unusedVariable = "This variable is not used anywhere.";
-let usedVariable = "This variable is used.";
-console.log(usedVariable);
-```
-
-在这个例子中，`let unusedVariable = "This variable is not used anywhere.";` 是一个变量声明，它的标识符 `unusedVariable` 没有被修改过，并且没有被引用，因此这个变量声明会被处理。
-`let usedVariable = "This variable is used.";` 是另一个变量声明，它的标识符 `usedVariable` 被引用了，因此这个变量声明不会被处理。
-因此，`removeSymbolVisitor` 函数会将未被引用的变量声明删除，如下所示：
-
-```javascript
-let usedVariable = "This variable is used.";
-console.log(usedVariable);
-```
-
-注意，`let unusedVariable = "This variable is not used anywhere.";` 被删除，因为它的标识符 `unusedVariable` 没有被引用。
-## inlineFunctionCallVisitor
- `inlineFunctionCallVisitor` 函数处理的是那些调用了一个对象的方法的表达式。
-这个方法必须是一个函数，这个函数的体只有一个返回语句，这个返回语句的参数数量必须和函数调用的参数数量相同。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let obj = {
-    "add": function(x, y) {
-        return x + y;
-    }
-};
-
-let result = obj.add(1, 2);
-```
-
-在这个例子中，`obj.add(1, 2)` 是一个调用表达式，它调用了一个对象的方法 `obj.add`，这个方法是一个函数 `function(x, y) { return x + y; }`，这个函数的体只有一个返回语句 `return x + y;`，这个返回语句的参数数量 `2` 和函数调用的参数数量 `2` 相同。
-因此，`inlineFunctionCallVisitor` 函数会将这个调用表达式替换为它的返回值，如下所示：
-
-```javascript
-let obj = {
-    "add": function(x, y) {
-        return x + y;
-    }
-};
-
-let result = 1 + 2;
-```
-
-注意，`obj.add(1, 2)` 被替换为它的返回值 `1 + 2`。
-## removeMemberExpressionVisitor
-`removeMemberExpressionVisitor` 函数处理的是那些包含对象属性访问的代码块。
-如果一个对象属性的值是一个字面量或者一个函数表达式，并且这个函数表达式没有引用，没有生成器，不是异步的，只有一个语句，并且不是递归的，那么这个对象属性就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let obj = {
-    "message": "Hello, world!",
-    "add": function(x, y) {
-        return x + y;
-    }
-};
-
-console.log(obj["message"]);
-console.log(obj["add"](1, 2));
-```
-
-在这个例子中，`obj["message"]` 和 `obj["add"](1, 2)` 都是对象属性访问。
-`obj["message"]` 的值是一个字符串字面量 `"Hello, world!"`，因此它会被处理。
-`obj["add"](1, 2)` 的值是一个函数表达式 `function(x, y) { return x + y; }`，这个函数表达式没有引用，没有生成器，不是异步的，只有一个语句 `return x + y;`，并且不是递归的，因此它也会被处理。
-因此，`removeMemberExpressionVisitor` 函数会将这些对象属性访问替换为它们的值，如下所示：
-
-```javascript
-let obj = {
-  "message": "Hello, world!",
-  "add": function (x, y) {
-    return x + y;
-  }
-};
-console.log("Hello, world!");
-console.log(function (x, y) {
-  return x + y;
-}(1, 2));
-```
-
-注意，`obj["message"]` 被替换为它的值 `"Hello, world!"`，`obj["add"](1, 2)` 被替换为它的值 `1 + 2`。
- 
- ## unreachablePathVisitor
- `unreachablePathVisitor` 函数处理的是那些包含不可达路径的 if 语句、条件表达式和 while 语句。
-如果一个 if 语句或条件表达式的测试条件可以确定为真或假，那么这个 if 语句或条件表达式就会被处理。
-如果一个 while 语句的测试条件可以确定为假，那么这个 while 语句就会被处理。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-if (true) {
-    console.log("True branch");
-} else {
-    console.log("False branch");
-}
-
-let num = true?1:2;
-
-while (false) {
-    console.log("Loop body");
-}
-```
-
-在这个例子中，`if (true) { ... } else { ... }` 是一个 if 语句，它的测试条件 `true` 可以确定为真，因此这个 if 语句会被处理。
-`let num = true?1:2`中三木运算符因同样属于条件判断语句而会被化简。
-`while (false) { ... }` 是一个 while 语句，它的测试条件 `false` 可以确定为假，因此这个 while 语句会被处理。
-因此，`unreachablePathVisitor` 函数会将这些语句替换或删除，如下所示：
-
-```javascript
-console.log("True branch");
-let num = 1;
-```
-
-注意，原来的 if 语句被替换为它的真分支，而原来的 while 语句被删除，因为它的测试条件为假，所以它的主体是不可达的。
-## callFunctionReverseVisitor
-`callFunctionReverseVisitor` 函数处理的是那些调用了一个成员表达式的调用表达式。
-这个成员表达式的对象可以是任何表达式，但是它的属性必须是一个字符串字面量，并且它必须是一个计算属性。
-然后，这个成员表达式在其他地方被调用时，会被替换为一个非计算属性。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let obj = {
-    "add": function(x, y) {
-        return x + y;
-    }
-};
-
-let result = obj["add"](1, 2);
-```
-
-在这个例子中，`obj["add"](1, 2)` 是一个调用表达式，它调用了一个成员表达式 `obj["add"]`，
-这个成员表达式的对象 `obj` 是一个标识符，这个标识符绑定到一个对象字面量 `{ "add": function(x, y) { return x + y; } }`，
-并且它的属性 `"add"` 是一个字符串字面量，这个字符串字面量是一个计算属性。
-因此，`callFunctionReverseVisitor` 函数会将这个成员表达式替换为一个非计算属性，如下所示：
-
-```javascript
-let obj = {
-    "add": function(x, y) {
-        return x + y;
-    }
-};
-
-let result = obj.add(1, 2);
-```
-
-注意，`obj["add"]` 被替换为 `obj.add`，因为 `obj.add` 是这个成员表达式的非计算属性形式。
-## switchControlsFlowFlatteningVisitor
-`switchControlsFlowFlatteningVisitor` 函数处理的是那些包含特定 while 循环和 switch 语句的代码块。这个 while 循环的条件必须始终为真，而且它的主体必须是一个包含 switch 语句和 break 语句的块语句。
-这个 switch 语句的判别式必须是一个成员表达式，其对象是一个标识符，这个标识符必须绑定到一个数组字面量。然后，这个 switch 语句的每个 case 必须以 continue 语句结束。
-
-以下是一个会被这个函数处理的示例：
-
-```javascript
-let arr = [0, 1, 2];
-while (true) {
-    switch (arr[i]) {
-        case 0:
-            console.log("Zero");
-            continue;
-        case 1:
-            console.log("One");
-            continue;
-        case 2:
-            console.log("Two");
-            continue;
-    }
-    break;
-}
-```
-
-在这个例子中，`while (true) { ... }` 是一个 while 循环，它的条件始终为真，而且它的主体是一个包含 switch 语句和 break 语句的块语句。
-这个 switch 语句的判别式 `arr[i]` 是一个成员表达式，其对象 `arr` 是一个标识符，这个标识符绑定到一个数组字面量 `[0, 1, 2]`。
-然后，这个 switch 语句的每个 case 都以 continue 语句结束。因此，`switchControlsFlowFlatteningVisitor` 函数会将这个 while 循环替换为一个新的代码块，如下所示：
-
-```javascript
+输入路径为 `-` 时从标准输入读取；未指定 `-o` 时，标准输出只包含生成代码，诊断写入标准错误。安装为 npm 包后也可使用 `js-ast-deobfuscator` 命令。
+
+| 选项 | 含义 |
+| --- | --- |
+| `-o, --output <path>` | 输出代码文件 |
+| `--report <path>` | 保存 JSON 变换报告 |
+| `--source-map` | 写入 `<输出文件>.map` 并追加 `sourceMappingURL`；需要 `-o` |
+| `--passes <names>` | 逗号分隔的 pass 名称；严格按指定顺序执行 |
+| `--profile <name>` | `safe`（默认）或 `readable` |
+| `--modernize class` | 显式启用最终 class 重建阶段；默认关闭 |
+| `--rename` | 在 `readable` 的最终阶段给私有绑定分配有证据的名称或中性编号，并记录映射 |
+| `--assume-data-eval` | 显式假设已识别的旧式 `eval` 数据入口只接收数据字面量；仅适用于 `readable`，默认关闭 |
+| `--max-iterations <n>` | 迭代上限，整数 1–50；`safe` 默认 5，`readable` 默认 12 |
+| `--source-type <type>` | `unambiguous`（默认）、`script` 或 `module` |
+| `--config <path>` | 加载 JSON 配置；命令行选项覆盖同名配置 |
+| `--list-passes` | 列出内置 pass |
+| `--help` / `--version` | 显示帮助或版本 |
+
+配置示例：
+
+```json
 {
-    console.log("Zero");
-    console.log("One");
-    console.log("Two");
+  "passes": ["normalize-literals", "decode-string-arrays", "constant-fold"],
+  "maxIterations": 5,
+  "profile": "safe",
+  "sourceType": "unambiguous"
 }
 ```
 
-注意，原来的 while 循环被替换为一个新的代码块，这个新的代码块包含了原来的 switch 语句的每个 case 的主体。
-## inlineConstValueVisitor
-这个 `inlineConstValueVisitor` 函数处理的是那些定义了常量值并在后续代码中使用这些常量的变量声明。如果一个变量声明的类型是 `const`，并且它的初始值是一个字面量或者一个标识符，那么这个变量声明就会被处理。
+未知参数、未知 pass、配置错误或语法错误会返回非零退出码。
 
-以下是一个会被这个函数处理的示例：
+## JavaScript API
 
-```javascript
-const PI = 3.14159;
-let area = PI * r * r;
+```js
+const { deobfuscate, listPasses } = require('js-ast-deobfuscator');
+
+const { code, map, report } = deobfuscate(source, {
+  filename: 'input.js',
+  sourceType: 'unambiguous',
+  sourceMaps: true,
+  profile: 'safe',
+  maxIterations: 5,
+});
+
+console.log(listPasses());
 ```
 
-在这个例子中，`PI` 是一个常量，它的值是一个数字字面量 `3.14159`。然后，这个常量在 `PI * r * r` 中被使用。因此，`inlineConstValueVisitor` 函数会将这个常量的所有引用替换为它的值，如下所示：
+在仓库内使用 `require('./src/index.js')`。`passes: []` 关闭迭代 pass；未启用 `modernize` 或 `renameBindings` 时只解析和重新打印。`plugins` 选项接受 Babel parser 的插件数组，默认启用 `jsx`；这不会执行 TypeScript 编译或 JSX 转译。
 
-```javascript
-let area = 3.14159 * r * r;
+API 和 JSON 配置还可设置静态解码上限：`maxDecoderOperations`（默认 2000000，范围 1000–10000000）、`maxStringArrayRotations`（默认 10000，范围 1–100000）、`maxDecodedStringLength`（默认 100000，范围 1024–1000000）。超出处理范围的调用保留；操作预算耗尽或旋转无法求解时记录诊断。
+
+## 两种处理配置
+
+`safe` 使用保守的静态变换，保留未证明可删除的脚本顶层绑定和源码自检代码。它适合先观察字符串解码、常量以及可证明的控制流和语句简化结果。格式变化本身仍可能触发依赖函数 `toString()` 的自检，因此它也不等同于运行时等价证明。
+
+`readable` 适合人工审阅：在局部语句和控制流变换之外，可清理符合条件的混淆器辅助族，并明确中和已识别的源码自检。该配置允许改变这些防护代码的行为；相关动作会记录在报告诊断中。它不会执行输入，也不会恢复原始变量名。真实样本的输出应作为分析材料，不能直接视为可替换线上脚本的产物。
+
+显式 `passes` 始终按给定列表执行。选择 `readable` 并不让工具任意删除动态逻辑，无法证明或未识别的形态仍需保留并检查报告。
+
+## 分层字符串解码与可读命名
+
+字符串表支持函数 provider 和直接声明的数组，包括自定义 Base64 字母表、严格识别的局部缓存、偏移索引，以及嵌套的十六字符替换编码。解码使用工具自身的实现，不执行输入 helper。不可变私有数组的静态自有元素索引可以继续还原；存在写入、逃逸、未知返回变换或可观察的缓存用途时保留原代码。
+
+动态作用域按绑定及变换位置检查。无关模块中的 `eval` 不再让整个文件停止优化；可见祖先绑定、`with` 和未知动态代码仍受保护。对 JSON2 兼容解析器，仅在匹配完整固定正则链、字符串强制转换、规范转义及无污染内建方法时，才能证明该处 `eval` 只求值 JSON 数据表达式。原解析器和 `eval` 保留在输出中。
+
+旧式播放器有时直接使用 `eval('(' + response.responseText + ')')` 或独立语句 `eval('var data=' + text)` 解析数据，没有 JSON2 的完整校验链。若调用方已核实这些入口的数据契约，可显式设置 `assumeDataEval: true`（CLI `--assume-data-eval`），与 `profile: 'readable'` 一起使用。工具只按已识别形状采用这个契约假设，不会证明网络响应安全，不执行输入，也不把原调用替换成 `JSON.parse`。
+
+括号表达式与单变量 `var` 声明分别处理。`var d`、`var data`、`var subs` 等形态仍会引入或修改名字：对应绑定、整个变量作用域内的路径和移动区域继续受保护；静态字符串解码使用单独的纯字面替换检查，避免为了解码而放开任意代码移动。未知 `eval` 和 `with` 不受该选项豁免。逐站点的原始位置、`introducedNames` 和 `proven: false` 写入 `report.assumptions`，并产生 `ASSUMED_DATA_EVAL` 诊断。默认模式与 JSON2 的自动证明规则保持不变。详细形状、限制和使用示例见 [数据 eval 假设](docs/data-eval.md)。
+
+`renameBindings: true`（CLI `--rename`）仅适用于 `readable`，在解码和可选 class 阶段之后执行一次。它按真实 Webpack 调用协议识别 `module`、`exports`、`require` 参数，按静态属性用途推导名称；没有证据时使用中性编号。会影响函数或类名称、动态作用域或公开可见性的绑定保留。`report.readability` 包含名称映射、命名理由和保留原因；中性编号不代表恢复了原始业务名。
+
+已识别的 Webpack bundle 可以拆成阅读摘录：
+
+```sh
+node scripts/extract-modules.cjs named.js artifacts/modules
 ```
 
-注意，`PI` 被替换为 `3.14159`，因为 `3.14159` 是这个常量的值。
-## BinaryExpressionVisitor
-`BinaryExpressionVisitor` 函数处理的是那些调用了一个函数表达式的调用表达式。
-这个函数表达式必须有两个参数，并且它的函数体只包含一个返回二元表达式的语句。
-然后，这个函数表达式在其他地方被调用时，会被替换为一个二元表达式。
+`index.json` 记录入口、模块编号、静态依赖和完整 bundle 行号。各 factory 摘录依赖原闭包，仅供阅读，不能独立执行。
 
-以下是一个会被这个函数处理的示例：
+仓库固定了一份易盾 `2.28.5` 静态回归样本，来源、时间及 SHA-256 见 `test/fixtures/netease-core-2.28.5.metadata.json`。运行 `npm run sample:yidun` 可在 `artifacts/yidun-core-2.28.5/` 重现完整输出、Source Map、变换报告、前后指标和模块阅读摘录。真实 SDK 不参与运行时测试，也不发起验证码请求。
 
-```javascript
-let result = (function(x, y) {
-    return x + y;
-})(1, 2);
+## 可选 class 重建
+
+```js
+const result = deobfuscate(source, {
+  profile: 'readable',
+  modernize: 'class',
+  sourceMaps: true,
+  filename: 'input.js',
+});
+console.log(result.report.modernization);
 ```
 
-在这个例子中，`(function(x, y) { return x + y; })(1, 2)` 是一个调用表达式，它调用了一个函数表达式，这个函数表达式有两个参数 `x` 和 `y`，并且它的函数体只包含一个返回 `x + y` 的语句。因此，`BinaryExpressionVisitor` 函数会将这个调用表达式替换为一个二元表达式，如下所示：
+`modernize` 默认是 `false`，选择 `readable` 也不会自动启用它。启用 `'class'` 后，工具先完成反混淆，再把符合条件的构造函数与 prototype/静态方法整理为 class。Lebab **3.2.9** 只处理经规范化和筛选的候选；Babel 负责绑定检查及放置转换结果。此过程不执行输入代码，也不猜测或恢复原始类名。
 
-```javascript
-let result = 1 + 2;
+已识别的 ES5 桥接继承由专门的 Babel 阶段恢复 `extends` / `super`，检查别名稳定性、引用时序和父构造器返回值；未知或不满足条件的动态继承保留原形式。继承转换记录带有 `engine: 'babel-inheritance'`。
+
+这是用于阅读的显式变换，存在 class 语法固有的行为差异：转成 class 方法的成员变为不可枚举且不能用 `new` 调用，构造器必须通过 `new` 调用，class 主体采用严格模式；函数声明提升与 class 的词法初始化也不同。保留的运行时 prototype 函数安装仍使用原来的赋值形式。工具检查可识别的用法并跳过不满足条件的候选，仍需阅读转换记录中的假设与 `skipped[].reason`，不能把转换数量理解为等价证明。
+
+报告中的 `modernization` 包括 `classesConverted`、`prototypeMethodsConverted`、`staticMethodsConverted`、`converted` 和 `skipped`。`converted` 记录名称、原始位置、放置位置、方法数、别名和假设；`skipped` 记录保留的构造函数及原因。反混淆计数仍在 `totals.changes`，class 阶段单独计入 `totals.modernizationChanges`。
+
+主要 pass：
+
+| pass | 主要能力 |
+| --- | --- |
+| `normalize-literals` | 规范数字、字符串和合法的计算属性写法 |
+| `decode-string-arrays` | 静态识别字符串表、索引偏移、别名、部分 Base64/RC4 解码和旋转表 |
+| `constant-fold` | 折叠可证明的 primitive 常量表达式 |
+| `inline-constants` | 内联已初始化且不变的私有常量 |
+| `inline-objects` | 简化无写入、无逃逸的私有对象属性和简单分发表 |
+| `inline-wrappers` | 展开参数表达式和调用代理，保留动态实参的求值顺序、次数与接收者语义 |
+| `control-flow` | 还原受限的字符串顺序表 + `while/switch` 调度器 |
+| `dead-code` | 清理可证明的不可达代码和无用私有声明，保留作用与声明提升 |
+| `normalize-statements` | 把逗号语句、语句中的条件/逻辑表达式等展开为易读的独立语句 |
+| `cleanup-decoders` | 清理已无外部用途的已识别字符串表、解码器、别名和旋转初始化器 |
+| `neutralize-self-defense` | 在 `readable` 配置下中和已识别的源码自检，记录有意行为变化 |
+
+变换采用保守策略：不确定的动态索引、绑定修改、TDZ、对象逃逸、getter、复杂控制流等通常保留。不会恢复原始变量名，也不保证完整还原任意混淆器。输出仍需结合原业务验证。详见 [设计和限制](docs/design.md)。
+
+## 扩展 pass
+
+```js
+const result = deobfuscate(source, {
+  passes: ['constant-fold', 'my-pass'],
+  customPasses: [{
+    name: 'my-pass',
+    description: '说明此变换的用途',
+    run(ast, context) {
+      // 使用 Babel AST；变更节点后返回实际修改次数。
+      // context.warn('MY_WARNING', '无法静态确定时保留原代码');
+      return 0;
+    },
+  }],
+});
 ```
 
-注意，`(function(x, y) { return x + y; })(1, 2)` 被替换为 `1 + 2`，因为 `1 + 2` 是这个调用表达式的结果。
-## inlineKVBinaryExpressionVisitor
-`inlineKVBinaryExpressionVisitor` 函数处理的是那些包含特定函数调用的变量声明。
-这些函数在对象属性中定义，并且它们的函数体只包含一个返回字面量的语句。然后，这些函数在其他地方被调用时，会被替换为一个二元表达式。
+`run` 必须同步返回非负整数。未指定 `passes` 时，自定义 pass 追加到默认管线；显式指定时，只运行列表中的 pass。名称需唯一并采用小写连字符格式。`context.options` 提供规范化选项，`context.warn(code, message, details?)` 将警告写入报告。自定义 pass 是本机受信任代码，应自行遵守静态处理原则；JSON 配置不加载可执行插件。
 
-以下是一个会被这个函数处理的示例：
+## 报告和真实样本
 
-```javascript
-let obj = {
-    add: function(x, y) {
-        return x + y;
-    }
-};
+报告包含 `profile`、输入/输出的 UTF-8 字节数及 SHA-256、每轮每个 pass 的修改数和耗时、收敛状态及诊断。`residuals.before` / `residuals.after` 比较 AST 节点、混淆命名绑定、别名、调度循环、代理函数候选、逗号/条件表达式和源码自检特征的数量。达到迭代上限或检测到循环时停止并报告。`changes` 和残留计数是静态分析指标，不代表还原比例。
 
-let result = obj.add(1, 2);
+超星播放器样本的复现入口为 `npm run sample:chaoxing`，对应 `scripts/chaoxing-sample.cjs`。它从仓库内固定的原始视频入口和 Video.js 扩展生成显式数据 eval 假设下的 readable 产物，默认写到 `artifacts/chaoxing/`，包括完整代码、Source Map、报告及转换前后残留审计。运行方法和样本来源见 [超星样本复现](docs/data-eval.md#超星样本复现)。输出用于代码审阅；字符串调用清零、重新解析通过或指标下降都不构成全程序等价证明，也不表示恢复了原始名称。
+
+```sh
+npm run sample
 ```
 
-在这个例子中，`obj` 是一个对象，它有一个属性 `add`，这个属性的值是一个函数，这个函数的函数体只包含一个返回 `x + y` 的语句。然后，这个函数在 `obj.add(1, 2)` 中被调用。
-因此，`inlineKVBinaryExpressionVisitor` 函数会将这个函数调用替换为一个二元表达式，如下所示：
+该命令静态处理 `test/fixtures/zhihuishu-2.obfuscated.js`，在 `artifacts/` 写出 `zhihuishu-2.readable.js`、对应 Source Map 和 `.readable.report.json`；`zhihuishu-2.comparison.json` 依据固定基线摘要对比新结果的静态指标。基线摘要保存在 [baseline 元数据](test/fixtures/zhihuishu-2.baseline.json)。样本来自智慧树网站的 `2.js` 快照，来源、抓取日期和 SHA-256 记录于 [fixture 元数据](test/fixtures/zhihuishu-2.metadata.json)。测试只转换和重新解析该文件，**不会执行它**。语义对比测试中的 `node:vm` 仅运行仓库内手写的受信任短程序。
 
-```javascript
-let obj = {
-    add: function(x, y) {
-        return x + y;
-    }
-};
+同时生成 `zhihuishu-2.business.js` 与 `zhihuishu-2.libraries.js`：按已识别的 UMD 结构分开业务定义与 CryptoJS/JSEncrypt，便于人工阅读。这两份是分析摘录，保留原文件执行顺序的完整产物是 `.readable.js`；摘录不是独立可运行模块。原样本命令使用的 `zhihuishu-2.js` 和 `.report.json` 路径也会更新。
 
-let result = 1 + 2;
-```
+样本命令还会从同一原始 fixture 独立启用 class 重建，新增 `zhihuishu-2.classes.js`、`.classes.js.map`、`.classes.report.json` 和 `.classes.comparison.json`，并保留前述输出。class 版 Source Map 指向原 fixture。`zhihuishu-2.class-preview.js` 摘出完整的 `pt`/JSEncrypt class，保留实际名称，并标注它在完整 class 文件中的行号；该摘录依赖外层闭包，**不能独立运行**。比较报告列出 class/方法语法数量、剩余 prototype 赋值，以及转换和跳过记录。
 
-注意，`obj.add(1, 2)` 被替换为 `1 + 2`，因为 `1 + 2` 是这个函数调用的结果。
-## UnicodeVisitor
-`UnicodeVisitor` 函数处理的是那些包含 Unicode 转义序列的字符串字面量。如果一个字符串字面量的值包含 `\u` 后跟四个十六进制数字的模式，那么这个字符串字面量就会被处理。
+另有 `zhihuishu-2.big-integer-preview.js` 与 `zhihuishu-2.rsa-preview.js`。前者展示完整的 `O`/BigInteger class，并附环境选择 `am` 和六项共享原型数据的完整原位初始化语句；后者同时展示 `nt` 父类与 `lt extends nt` 子类。同样保留原名称、完整文件位置和非独立运行说明。BigInteger 摘录中把分散的段落并排展示只为阅读，不能据此把运行时初始化提前到 class 声明之后。
 
-以下是一个会被这个函数处理的示例：
+`zhihuishu-2.prototype-inventory.json` 全量盘点 readable 与 class 两版的 prototype 用法：文本出现次数、AST 成员访问、直接/条件方法安装、共享原型数据写入、整体原型替换、内建或动态读/调用，并按构造器族列出数量与行号。类内 `static` 块与类外位置分别计数。此样本的 `am` 三分支和六项数据保持原初始化位置，通过 `runtimeInstallationsRetained` 等记录解释保留原因，避免改变 `navigator`、`ot` 和别名 `A` 的时序。它也对照固定的 [2.2.0 class 基线](test/fixtures/zhihuishu-2.classes-baseline.json)；旧输出保留在 `artifacts/v2.2.0/`。
 
-```javascript
-let str = "Hello, \\u4E16\\u754C!";
-```
+prototype 访问本身不等于混淆。BigInteger 的环境选择方法和共享常量、CryptoJS 的委托对象模型、通用继承/描述符操作及 `Object.prototype` 调用都有语义用途；这些应保留或在 class 内集中表达。覆盖率针对可合并的直接方法安装，不以消除所有 `.prototype` 文本为目标。
 
-在这个例子中，`str` 变量的值 `"Hello, \\u4E16\\u754C!"` 是一个字符串字面量，它包含 Unicode 转义序列 `\\u4E16` 和 `\\u754C`。因此，`UnicodeVisitor` 函数会将这些 Unicode 转义序列转换为它们所对应的字符，如下所示：
+当前固定样本的 class 覆盖对比：
 
-```javascript
-let str = "Hello, 世界!";
-```
+| 指标 | 2.2.0 class 基线 | 当前 class 结果 |
+| --- | ---: | ---: |
+| 生成 class | 6 | 14 |
+| 转为 class 的原型方法 | 41 | 152 |
+| 转为 class 的静态方法 | 2 | 5 |
+| 类外 prototype 函数赋值 | 114 | 3（运行时 `am` 选择） |
+| AST prototype 成员访问 | 139 | 25 |
+| 字面文本 `.prototype.` | 126 | 15 |
 
-注意，`\\u4E16` 和 `\\u754C` 被替换为 `世` 和 `界`，因为 `世` 和 `界` 是这些 Unicode 转义序列所对应的字符。
-## marshalObjectVisitor
-marshalObjectVisitor 函数处理的是那些初始化为特定函数调用的变量声明。
-特定的函数名由 marshalFuncName 参数给出。
-如果一个变量被初始化为这个函数的调用，并且这个函数的第一个参数是一个字符串，那么这个变量就会被处理。
+readable 版中的 152 处直接方法安装已全部集中到 class。余下 25 处 AST 访问分类为 3 处条件函数安装、9 处数据赋值、5 处整体原型替换和 8 处读/调用，均可在 inventory 中逐条定位；没有未解释的直接方法安装大簇。`x/I/P/q/L/O/nt/lt` 已覆盖，其中 `lt extends nt`；BigInteger 的三种 `am` 实现和共享数据仍按原环境与时序初始化。
 
-以下是一个会被这个函数处理的示例：
-```javascript
-let foo = marshalFunc('bar');
-```
-在这个例子中，变量 foo 被初始化为 marshalFunc('bar') 的调用。
-因此，marshalObjectVisitor 函数会删除这个变量声明，并且在后续的代码中，所有 foo 的引用都会被替换为 'bar'。
-## constructFuncToClassVisitor
-constructFuncToClassVisitor 函数处理的是那些可以被转换为类的函数声明。
-如果一个函数声明使用了 this 关键字，并且有一些方法被赋值给它的原型，那么这个函数就可以被转换为类。
+真实样本测试还要求至少解析 1200 处字符串调用，并检查关键 URL 和 `aesUtil.encrypt` 可读访问，防止仅重新排版也被误判为成功。这些是静态回归指标，不证明真实网站样本的运行时行为完全等价。
 
-以下是一个会被这个函数处理的示例：
-```javascript
-function MyObject() {
-    this.name = 'MyObject';
-}
+当前固定快照的静态比较：旧结果中的 3 个调度循环降为 0，代理函数候选从 309 降为 4，混淆命名别名声明从 197 降为 9，混淆命名绑定从 1525 降为 365。测试还检查 `labc` 的 AJAX 参数和 Promise 回调直调、伪分支移除，以及 `yxyz` 返回 `aesUtil.encrypt`。余下 4 个候选位于 JSEncrypt，分别返回 `t & e`、`t | e`、`t ^ e`、`t & ~e`，是库的位运算辅助函数，保留其函数值用途。数字代表模式匹配结果，不代表未还原的业务功能数量。
 
-MyObject.prototype.sayHello = function() {
-    console.log('Hello, ' + this.name);
-};
-```
-在这个例子中，MyObject 函数使用了 this 关键字，并且有一个方法 sayHello 被赋值给它的原型。
-因此，constructFuncToClassVisitor 函数会将这个函数转换为类，如下所示：
-```javascript
-class MyObject {
-    constructor() {
-        this.name = 'MyObject';
-    }
+## 旧版本和许可
 
-    sayHello() {
-        console.log('Hello, ' + this.name);
-    }
-}
-```
-## removeUnusedVariablesVisitor
-removeUnusedVariablesVisitor 函数处理的是那些在父作用域中定义但从未被读取过的变量。
+2.x 使用统一的 `deobfuscate()` / CLI 接口。原 `main.js`、`visitor.js` 保存在 `legacy/`，旧输入输出保存在 `examples/legacy/`，供历史参考；旧 visitor API 不属于新运行入口。仓库根目录 `main.js` 是新 CLI 的兼容启动入口。
 
-以下是一个会被这个函数处理的示例：
-```javascript
-function test() {
-    let unusedVar = "I am unused";
-    let usedVar = "I am used";
-    console.log(usedVar);
-}
-```
-在这个例子中，unusedVar 变量在 test 函数的作用域中定义，但从未被读取过。
-因此，removeUnusedVariablesVisitor 函数会删除这个变量声明，如下所示：
-```javascript
-function test() {
-    let usedVar = "I am used";
-    console.log(usedVar);
-}
-```
-注意，usedVar 变量虽然也在 test 函数的作用域中定义，但它被 console.log 读取了，所以它不会被删除。
-## replaceVariableWithItsInitializerVariableVisitor
-
-```javascript
-var a = 1;
-var b = a;
-var c = b;
-```
-
-在这个代码中，变量 `b` 和 `c` 的初始化器都是另一个变量。你的访问者将会把它们的初始化器替换为 `1`，这是变量 `a` 的初始化器。
-## mergeObjectInitializationVisitor
-`mergeObjectInitializationVisitor`访问者会查找所有的空对象声明，并将后续对这些对象的赋值合并到对象声明中。以下是一个会被这个访问者处理的示例代码：
-
-```javascript
-var obj = {};
-obj.prop1 = "value1";
-obj.prop2 = function() { return "value2"; };
-obj["prop3"] = "value3";
-```
-
-在这个代码中，我们首先声明了一个空对象`obj`，然后我们对`obj`的`prop1`、`prop2`和`prop3`属性进行了赋值。
-`mergeObjectInitializationVisitor`访问者会将这些赋值合并到`obj`的声明中，得到以下的代码：
-
-```javascript
-var obj = {
-    prop1: "value1",
-    prop2: function() { return "value2"; },
-    prop3: "value3"
-};
-```
-
-请注意，这个访问者只会处理在同一个作用域中的对象声明和赋值。
-如果赋值发生在一个不同的作用域（例如在一个函数中），那么这个赋值就不会被合并到对象声明中。
-## replaceRenamedVariableWithOriginalVariableVisitor
-这个访问者的目标是找到那些被重新赋值的变量，并将它们替换为原始的变量。以下是一个会被这个访问者处理的示例代码：
-
-```javascript
-var originalVar = function() { return "original"; };
-var renamedVar = originalVar;
-renamedVar();
-```
-
-在这个代码中，我们首先声明了一个函数`originalVar`，然后我们创建了一个新的变量`renamedVar`，并将它初始化为`originalVar`。然后我们调用了`renamedVar`。
-
-`replaceRenamedVariableWithOriginalVariableVisitor`访问者会将`renamedVar`替换为`originalVar`，得到以下的代码：
-
-```javascript
-var originalVar = function() { return "original"; };
-var renamedVar = originalVar;
-originalVar();
-```
-
-请注意，这个访问者只会处理在同一个作用域中的变量声明和赋值。如果赋值发生在一个不同的作用域（例如在一个函数中），那么这个赋值就不会被替换。
+项目沿用 [MadLongTom/JS-AST-Deobfuscator](https://github.com/MadLongTom/JS-AST-Deobfuscator) 的 MIT 许可，保留 `Copyright (c) 2024 MadLongTom`，见 [LICENSE](LICENSE)。第三方网站样本及其内嵌库保留原权利和许可声明，不因收录为测试 fixture 而改为本项目的 MIT 许可。

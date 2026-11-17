@@ -1,0 +1,10 @@
+{
+  "filename": "zhihuishu-2.obfuscated.js",
+  "sourceUrl": "https://base2.zhihuishu.com/js/2.js",
+  "capturedDate": "2026-10-19",
+  "originalLocalSnapshot": "site-analysis/02-2.js",
+  "bytes": 165929,
+  "sha256": "f3d1f73e586f022d3e0d7f2237a37c09cb9ae5136fb8f1ca3b4111221fc3ccfe",
+  "purpose": "Static parsing and transformation regression only. Never execute this fixture.",
+  "license": "Third-party website asset; not covered by this project's MIT license. Original rights and bundled notices remain with their respective owners."
+}

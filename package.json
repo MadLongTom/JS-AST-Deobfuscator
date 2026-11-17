@@ -1,0 +1,45 @@
+{
+  "name": "js-ast-deobfuscator",
+  "version": "2.5.0",
+  "description": "A static, scope-aware Babel pipeline for JavaScript deobfuscation",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "bin": {
+    "js-ast-deobfuscator": "bin/js-ast-deobfuscator.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./passes": "./src/passes/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node scripts/test.cjs",
+    "lint": "node scripts/check.cjs",
+    "check": "npm run lint && npm test",
+    "sample": "node scripts/sample.cjs",
+    "sample:yidun": "node scripts/yidun-sample.cjs",
+    "sample:chaoxing": "node scripts/chaoxing-sample.cjs"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {
+    "@babel/generator": "7.29.8",
+    "@babel/parser": "7.29.9",
+    "@babel/traverse": "7.29.10",
+    "@babel/types": "7.29.8",
+    "lebab": "3.2.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MadLongTom/JS-AST-Deobfuscator.git"
+  },
+  "author": "MadLongTom",
+  "license": "MIT"
+}

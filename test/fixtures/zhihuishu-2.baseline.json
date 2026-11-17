@@ -1,0 +1,16 @@
+{
+  "description": "Static indicators of the previous v2 output before the structural readability extension; not execution results.",
+  "inputSha256": "f3d1f73e586f022d3e0d7f2237a37c09cb9ae5136fb8f1ca3b4111221fc3ccfe",
+  "outputSha256": "8754242566b7167ce64a676f217ed8ba6537fc96bb40704399e814e08f1d6711",
+  "bytes": 196353,
+  "metrics": {
+    "nodes": 36241,
+    "obfuscatedBindings": 1525,
+    "obfuscatedAliasDeclarations": 197,
+    "dispatcherLoops": 3,
+    "proxyFunctionCandidates": 309,
+    "sequenceExpressions": 443,
+    "conditionalExpressions": 222,
+    "sourceSelfDefensePatterns": 3
+  }
+}

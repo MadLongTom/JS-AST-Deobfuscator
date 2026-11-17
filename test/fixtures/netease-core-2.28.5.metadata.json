@@ -1,0 +1,12 @@
+{
+  "filename": "netease-core-2.28.5.obfuscated.js",
+  "sourceUrl": "https://cstaticdun.126.net/2.28.5/core-optimi.m25b40.v2.28.5.min.js",
+  "capturedAt": "2026-10-20",
+  "sourcePage": "https://login.zhihuishu.com/",
+  "provider": "NetEase Yidun",
+  "coreVersion": "2.28.5",
+  "loaderVersion": "2.5.4",
+  "bytes": 631406,
+  "sha256": "de1b1412257aec714dfc50b49e249f925197647dddef3d178ba791612ffc38a2",
+  "purpose": "Static regression fixture. Third-party source, not part of this project implementation; never execute it in tests."
+}

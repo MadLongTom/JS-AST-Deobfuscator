@@ -1,0 +1,21 @@
+{
+  "sourceType": "unambiguous",
+  "profile": "safe",
+  "maxIterations": 5,
+  "maxDecoderOperations": 2000000,
+  "maxStringArrayRotations": 10000,
+  "maxDecodedStringLength": 100000,
+  "passes": [
+    "normalize-literals",
+    "decode-string-arrays",
+    "normalize-statements",
+    "inline-constants",
+    "inline-objects",
+    "inline-wrappers",
+    "constant-fold",
+    "neutralize-self-defense",
+    "control-flow",
+    "dead-code",
+    "cleanup-decoders"
+  ]
+}

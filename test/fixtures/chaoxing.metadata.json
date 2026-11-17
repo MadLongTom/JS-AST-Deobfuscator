@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-29",
+  "provider": "Chaoxing Ananas / Fanya",
+  "sourcePage": "https://gwzy.mh.chaoxing.com/",
+  "provenance": "Byte-preserved public static JavaScript supplied in the local analysis workspace. Script paths and cache markers are recorded from the associated video HTML; original download date is unknown. These files contain vendor implementation code, not an authenticated page or account response.",
+  "purpose": "Offline static regression fixtures. Third-party code is never imported, evaluated or executed by the build or tests. Cache query markers are not claimed to be semantic SDK versions.",
+  "samples": [
+    {
+      "name": "video-index",
+      "filename": "chaoxing-video-index.obfuscated.js",
+      "scriptPath": "/ananas/modules/video/index.js?v=2026-1012-05",
+      "bytes": 126490,
+      "sha256": "e6c16ef8b0f2082f7abd8a51357b6875349be14c2a10ccf8879e1047b9f7e406",
+      "familyNames": ["_0x32b4", "_0xe925"],
+      "decoderName": "_0xe925",
+      "minimumDecodedCalls": 2389,
+      "evalSignatures": ["parenthesized-expression", "parenthesized-expression", "parenthesized-expression", "parenthesized-expression", "parenthesized-expression", "parenthesized-expression", "parenthesized-expression", "parenthesized-expression"],
+      "markers": ["AttachmentSetting", "loadVideo", "reportUrl", "headOffset", "playTime", "supportHeartbeat", "receiveStudyLog", "/keeper/api/receive-studylog"],
+      "functions": ["loadVideo", "showHTML5Player", "proxy_completed", "sendReadZTMediaLog", "receiveStudyLog"]
+    },
+    {
+      "name": "videojs-ext",
+      "filename": "chaoxing-videojs-ext.obfuscated.js",
+      "scriptPath": "/ananas/videojs-ext/videojs-ext.min.js?v=2026-1012-06",
+      "bytes": 259127,
+      "sha256": "8d12852fb77870007d999664c5057d94d2eff3f058b5177f0b967a02d57ddc42",
+      "familyNames": ["_0x2ae2", "_0x19ef"],
+      "decoderName": "_0x19ef",
+      "minimumDecodedCalls": 4690,
+      "evalSignatures": ["variable-declaration:d", "variable-declaration:data", "parenthesized-expression", "variable-declaration:data", "variable-declaration:subs", "parenthesized-expression", "variable-declaration:d", "variable-declaration:d"],
+      "markers": ["ans.VideoJs", "seekBarControl", "reportUrl", "sendLog", "reportTimeInterval", "isPassed", "&playingTime=", "&duration=", "&clipTime=", "&isdrag=", "&enc=", "&attDuration=", "&attDurationEnc=", "&courseEngineInfo=", "sendStuJobInfoMsg", "proxy_completed"],
+      "functions": []
+    }
+  ]
+}
